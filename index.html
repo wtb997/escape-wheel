@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>隨機抽提示轉盤</title>
+  <style>
+    :root {
+      --bg-start: #0f172a;
+      --bg-end: #1e293b;
+      --card-bg: rgba(30, 41, 59, 0.88);
+      --card-border: rgba(148, 163, 184, 0.22);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #f59e0b;
+      --accent-hover: #d97706;
+      --special: #ec4899;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      color: var(--text-main);
+      background: radial-gradient(circle at top, #1e3a5f 0%, var(--bg-start) 55%, #090e1a 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 16px 68px;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 960px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+      align-items: center;
+    }
+
+    @media (min-width: 820px) {
+      .app-container {
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 32px;
+      }
+    }
+
+    header {
+      grid-column: 1 / -1;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: clamp(1.6rem, 3.2vw, 2.2rem);
+      letter-spacing: 0.06em;
+      color: #ffffff;
+      text-shadow: 0 2px 12px rgba(56, 189, 248, 0.28);
+    }
+
+    header p {
+      margin: 6px 0 0;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    .wheel-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .wheel-stage {
+      position: relative;
+      width: min(86vw, 430px);
+      height: min(86vw, 430px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    canvas#wheelCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: pointer;
+      filter: drop-shadow(0 16px 32px rgba(0, 0, 0, 0.45));
+    }
+
+    .pointer-wrap {
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      pointer-events: none;
+      transform-origin: 50% 10px;
+      transition: transform 0.08s ease-out;
+    }
+
+    .pointer-wrap.tick {
+      transform: translateX(-50%) rotate(-16deg);
+    }
+
+    .pointer-svg {
+      width: 44px;
+      height: 52px;
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+    }
+
+    .controls-row {
+      margin-top: 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      appearance: none;
+      border: none;
+      border-radius: 999px;
+      padding: 14px 36px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #0f172a;
+      background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);
+      box-shadow: 0 8px 22px rgba(245, 158, 11, 0.38);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s ease;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 26px rgba(245, 158, 11, 0.5);
+    }
+
+    .btn-primary:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      appearance: none;
+      border: 1px solid var(--card-border);
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-main);
+      background: rgba(15, 23, 42, 0.65);
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(51, 65, 85, 0.85);
+      border-color: rgba(148, 163, 184, 0.45);
+    }
+
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .result-box {
+      border-radius: 16px;
+      padding: 20px 16px;
+      text-align: center;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .result-box.pop {
+      transform: scale(1.03);
+      border-color: #fbbf24;
+      box-shadow: 0 0 24px rgba(251, 191, 36, 0.25);
+    }
+
+    .result-box.special {
+      border-color: #f472b6;
+      box-shadow: 0 0 26px rgba(236, 72, 153, 0.32);
+    }
+
+    .result-label {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .result-value {
+      font-size: clamp(1.8rem, 4.5vw, 2.5rem);
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      color: #fde047;
+      min-height: 1.3em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .result-box.special .result-value {
+      color: #f9a8d4;
+    }
+
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .history-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .count-badge {
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.18);
+      color: #7dd3fc;
+    }
+
+    .btn-clear {
+      appearance: none;
+      border: 1px solid rgba(248, 113, 113, 0.35);
+      background: rgba(127, 29, 29, 0.25);
+      color: #fca5a5;
+      border-radius: 10px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .btn-clear:hover {
+      background: rgba(185, 28, 28, 0.42);
+    }
+
+    .history-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 240px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .history-empty {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      padding: 22px 8px;
+      border: 1px dashed rgba(148, 163, 184, 0.25);
+      border-radius: 12px;
+    }
+
+    .history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.58);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      font-size: 0.98rem;
+    }
+
+    .history-item.special-item {
+      border-color: rgba(244, 114, 182, 0.45);
+      background: rgba(131, 24, 67, 0.28);
+    }
+
+    .history-order {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      min-width: 44px;
+    }
+
+    .history-text {
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #f8fafc;
+    }
+
+    .history-item.special-item .history-text {
+      color: #fbcfe8;
+    }
+
+    .creator-credit {
+      position: fixed;
+      right: 14px;
+      bottom: 10px;
+      text-align: right;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      color: rgba(226, 232, 240, 0.72);
+      background: rgba(15, 23, 42, 0.65);
+      padding: 6px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      pointer-events: none;
+      z-index: 50;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <h1>隨機抽提示轉盤</h1>
+      <p>點擊「開始抽提示」或輕觸轉盤中央即可旋轉</p>
+    </header>
+
+    <section class="wheel-section">
+      <div class="wheel-stage">
+        <div class="pointer-wrap" id="pointerWrap" aria-hidden="true">
+          <svg class="pointer-svg" viewBox="0 0 44 52">
+            <path d="M22 50 L4 14 A18 18 0 1 1 40 14 Z" fill="#facc15" stroke="#0f172a" stroke-width="3" stroke-linejoin="round" />
+            <circle cx="22" cy="18" r="6" fill="#0f172a" />
+          </svg>
+        </div>
+        <canvas id="wheelCanvas" width="460" height="460" aria-label="隨機抽提示轉盤"></canvas>
+      </div>
+
+      <div class="controls-row">
+        <button id="spinBtn" class="btn-primary" type="button">開始抽提示</button>
+        <button id="soundBtn" class="btn-secondary" type="button">音效：開</button>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="result-box" id="resultBox">
+        <div class="result-label">本次抽中提示</div>
+        <div class="result-value" id="resultValue">尚未抽取</div>
+      </div>
+
+      <div>
+        <div class="history-header">
+          <div class="history-title">
+            抽籤紀錄
+            <span class="count-badge" id="countBadge">0 次</span>
+          </div>
+          <button id="clearBtn" class="btn-clear" type="button">清除紀錄</button>
+        </div>
+        <ul class="history-list" id="historyList">
+          <li class="history-empty">目前還沒有抽籤紀錄</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+
+  <div class="creator-credit">
+    <div>創作者:黃朝盈老師</div>
+    <div>版本v1.0</div>
+  </div>
+
+  <script>
+    (function () {
+      // 7 格資料（內部加權：前 6 格各 16%，「下集待續」4%，介面不顯示任何機率字樣）
+      const SEGMENTS = [
+        { label: "1-14-8", weight: 16, color: "#3b82f6", textColor: "#ffffff", isSpecial: false },
+        { label: "19-6-16-10", weight: 16, color: "#10b981", textColor: "#ffffff", isSpecial: false },
+        { label: "11-3-5", weight: 16, color: "#f59e0b", textColor: "#0f172a", isSpecial: false },
+        { label: "13-2-7", weight: 16, color: "#8b5cf6", textColor: "#ffffff", isSpecial: false },
+        { label: "9-17-4", weight: 16, color: "#06b6d4", textColor: "#0f172a", isSpecial: false },
+        { label: "18-12-15", weight: 16, color: "#f97316", textColor: "#ffffff", isSpecial: false },
+        { label: "下集待續", weight: 4, color: "#db2777", textColor: "#ffffff", isSpecial: true }
+      ];
+
+      const TOTAL_WEIGHT = SEGMENTS.reduce((sum, s) => sum + s.weight, 0);
+      const TWO_PI = Math.PI * 2;
+      const POINTER_ANGLE = -Math.PI / 2; // 頂端 12 點鐘方向
+
+      // 預先計算每格的精確角度區間與累積權重
+      let accAngle = 0;
+      let accWeight = 0;
+      const SLICES = SEGMENTS.map((seg, idx) => {
+        const span = (seg.weight / TOTAL_WEIGHT) * TWO_PI;
+        const startAngle = accAngle;
+        const endAngle = accAngle + span;
+        accAngle = endAngle;
+        accWeight += seg.weight;
+        return {
+          ...seg,
+          index: idx,
+          startAngle,
+          endAngle,
+          span,
+          cumWeight: accWeight
+        };
+      });
+
+      const canvas = document.getElementById("wheelCanvas");
+      const ctx = canvas.getContext("2d");
+      const spinBtn = document.getElementById("spinBtn");
+      const soundBtn = document.getElementById("soundBtn");
+      const clearBtn = document.getElementById("clearBtn");
+      const resultBox = document.getElementById("resultBox");
+      const resultValue = document.getElementById("resultValue");
+      const historyList = document.getElementById("historyList");
+      const countBadge = document.getElementById("countBadge");
+      const pointerWrap = document.getElementById("pointerWrap");
+
+      let currentRotation = 0;
+      let isSpinning = false;
+      let soundEnabled = true;
+      let audioCtx = null;
+      let history = [];
+      let lastPointerSlice = -1;
+      let tickTimeout = null;
+
+      // 高品質均勻亂數 [0, 1)
+      function secureRandom() {
+        if (window.crypto && window.crypto.getRandomValues) {
+          const buf = new Uint32Array(1);
+          window.crypto.getRandomValues(buf);
+          return buf[0] / 4294967296;
+        }
+        return Math.random();
+      }
+
+      // 依累積權重精準抽出中獎格索引（杜絕角度誤差）
+      function pickWeightedIndex() {
+        const r = secureRandom() * TOTAL_WEIGHT;
+        for (let i = 0; i < SLICES.length; i++) {
+          if (r < SLICES[i].cumWeight) {
+            return i;
+          }
+        }
+        return SLICES.length - 1;
+      }
+
+      // 計算目前頂端指針指到的扇形索引（供旋轉過程觸發指針撥動音效）
+      function getSliceAtPointer(rotation) {
+        let localAngle = (POINTER_ANGLE - rotation) % TWO_PI;
+        if (localAngle < 0) localAngle += TWO_PI;
+        for (let i = 0; i < SLICES.length; i++) {
+          if (localAngle >= SLICES[i].startAngle && localAngle < SLICES[i].endAngle) {
+            return i;
+          }
+        }
+        return SLICES.length - 1;
+      }
+
+      function ensureAudio() {
+        if (!soundEnabled) return;
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+          }
+        }
+        if (audioCtx && audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+      }
+
+      function playTickSound() {
+        if (!soundEnabled || !audioCtx) return;
+        try {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(760, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(280, audioCtx.currentTime + 0.035);
+          gain.gain.setValueAtTime(0.09, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.045);
+        } catch (e) {}
+      }
+
+      function playWinSound(isSpecial) {
+        if (!soundEnabled || !audioCtx) return;
+        try {
+          const notes = isSpecial ? [523.25, 659.25, 783.99, 1046.5] : [523.25, 659.25, 783.99];
+          notes.forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const t = audioCtx.currentTime + i * 0.09;
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(0.12, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(t);
+            osc.stop(t + 0.28);
+          });
+        } catch (e) {}
+      }
+
+      function triggerPointerTick() {
+        pointerWrap.classList.add("tick");
+        clearTimeout(tickTimeout);
+        tickTimeout = setTimeout(() => {
+          pointerWrap.classList.remove("tick");
+        }, 75);
+        playTickSound();
+      }
+
+      function setupHiDPI() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const displaySize = canvas.clientWidth || 430;
+        canvas.width = Math.round(displaySize * dpr);
+        canvas.height = Math.round(displaySize * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        drawWheel(currentRotation);
+      }
+
+      function drawWheel(rotation) {
+        const size = canvas.clientWidth || 430;
+        const cx = size / 2;
+        const cy = size / 2;
+        const outerRadius = size * 0.47;
+        const wheelRadius = outerRadius - 8;
+
+        ctx.clearRect(0, 0, size, size);
+
+        // 外框光環
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerRadius, 0, TWO_PI);
+        ctx.fillStyle = "#1e293b";
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#facc15";
+        ctx.stroke();
+        ctx.restore();
+
+        // 繪製 7 個扇形
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rotation);
+
+        SLICES.forEach((slice) => {
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.arc(0, 0, wheelRadius, slice.startAngle, slice.endAngle);
+          ctx.closePath();
+          ctx.fillStyle = slice.color;
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "rgba(15, 23, 42, 0.85)";
+          ctx.stroke();
+
+          // 繪製文字（不含任何機率字體）
+          const midAngle = (slice.startAngle + slice.endAngle) / 2;
+          ctx.save();
+          ctx.rotate(midAngle);
+          ctx.textAlign = "right";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = slice.textColor;
+
+          const baseFontSize = Math.max(12, Math.round(wheelRadius * (slice.isSpecial ? 0.082 : 0.108)));
+          ctx.font = `800 ${baseFontSize}px "Noto Sans TC", "Microsoft JhengHei", sans-serif`;
+          ctx.shadowColor = slice.textColor === "#ffffff" ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.25)";
+          ctx.shadowBlur = 3;
+          ctx.fillText(slice.label, wheelRadius - 14, 0);
+          ctx.restore();
+        });
+
+        // 外圍鉚釘裝飾點
+        for (let i = 0; i < SLICES.length; i++) {
+          const angle = SLICES[i].startAngle;
+          const dx = Math.cos(angle) * (wheelRadius + 4);
+          const dy = Math.sin(angle) * (wheelRadius + 4);
+          ctx.beginPath();
+          ctx.arc(dx, dy, 3, 0, TWO_PI);
+          ctx.fillStyle = "#fef08a";
+          ctx.fill();
+        }
+
+        ctx.restore();
+
+        // 中央按鈕圓盤
+        const hubRadius = Math.max(28, wheelRadius * 0.19);
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, hubRadius, 0, TWO_PI);
+        const hubGrad = ctx.createRadialGradient(cx - 5, cy - 5, 4, cx, cy, hubRadius);
+        hubGrad.addColorStop(0, "#334155");
+        hubGrad.addColorStop(1, "#0f172a");
+        ctx.fillStyle = hubGrad;
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#facc15";
+        ctx.stroke();
+
+        ctx.fillStyle = "#fde047";
+        ctx.font = `800 ${Math.max(13, Math.round(hubRadius * 0.44))}px "Noto Sans TC", sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("GO", cx, cy + 1);
+        ctx.restore();
+      }
+
+      function easeOutQuart(t) {
+        return 1 - Math.pow(1 - t, 4);
+      }
+
+      function renderHistory() {
+        countBadge.textContent = `${history.length} 次`;
+        if (history.length === 0) {
+          historyList.innerHTML = '<li class="history-empty">目前還沒有抽籤紀錄</li>';
+          return;
+        }
+        historyList.innerHTML = history
+          .map((item, idx) => {
+            const orderNum = history.length - idx;
+            const cls = item.isSpecial ? "history-item special-item" : "history-item";
+            return `<li class="${cls}"><span class="history-order">第 ${orderNum} 次</span><span class="history-text">${item.label}</span></li>`;
+          })
+          .join("");
+      }
+
+      function startSpin() {
+        if (isSpinning) return;
+        ensureAudio();
+        isSpinning = true;
+        spinBtn.disabled = true;
+        resultBox.classList.remove("pop", "special");
+        resultValue.textContent = "旋轉中...";
+
+        // 1. 先依精準加權抽出唯一中獎格
+        const winnerIndex = pickWeightedIndex();
+        const winner = SLICES[winnerIndex];
+
+        // 2. 在中獎格內安全範圍（避開邊界 15%）隨機挑選停點
+        const safeMargin = winner.span * 0.15;
+        const targetLocalAngle =
+          winner.startAngle + safeMargin + secureRandom() * (winner.span - safeMargin * 2);
+
+        // 3. 反推目標旋轉角度，使指針精準指在 targetLocalAngle
+        const desiredMod = (((POINTER_ANGLE - targetLocalAngle) % TWO_PI) + TWO_PI) % TWO_PI;
+        const currentMod = ((currentRotation % TWO_PI) + TWO_PI) % TWO_PI;
+        let delta = desiredMod - currentMod;
+        if (delta <= 0) delta += TWO_PI;
+
+        const extraSpins = 6 + Math.floor(secureRandom() * 3); // 6~8 圈
+        const startRotation = currentRotation;
+        const totalDelta = extraSpins * TWO_PI + delta;
+        const duration = 4200;
+        const startTime = performance.now();
+        lastPointerSlice = getSliceAtPointer(currentRotation);
+
+        function animate(now) {
+          const elapsed = now - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const eased = easeOutQuart(progress);
+          currentRotation = startRotation + totalDelta * eased;
+
+          drawWheel(currentRotation);
+
+          const nowSlice = getSliceAtPointer(currentRotation);
+          if (nowSlice !== lastPointerSlice) {
+            lastPointerSlice = nowSlice;
+            triggerPointerTick();
+          }
+
+          if (progress < 1) {
+            requestAnimationFrame(animate);
+          } else {
+            // 正規化角度避免數值過大
+            currentRotation = currentRotation % TWO_PI;
+            drawWheel(currentRotation);
+            isSpinning = false;
+            spinBtn.disabled = false;
+
+            resultValue.textContent = winner.label;
+            resultBox.classList.add("pop");
+            if (winner.isSpecial) {
+              resultBox.classList.add("special");
+            }
+            playWinSound(winner.isSpecial);
+
+            history.unshift({ label: winner.label, isSpecial: winner.isSpecial });
+            renderHistory();
+          }
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      spinBtn.addEventListener("click", startSpin);
+
+      canvas.addEventListener("click", (e) => {
+        if (isSpinning) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left - rect.width / 2;
+        const y = e.clientY - rect.top - rect.height / 2;
+        const dist = Math.hypot(x, y);
+        if (dist <= rect.width * 0.47) {
+          startSpin();
+        }
+      });
+
+      soundBtn.addEventListener("click", () => {
+        soundEnabled = !soundEnabled;
+        soundBtn.textContent = soundEnabled ? "音效：開" : "音效：關";
+        if (soundEnabled) ensureAudio();
+      });
+
+      clearBtn.addEventListener("click", () => {
+        if (isSpinning) return;
+        history = [];
+        resultBox.classList.remove("pop", "special");
+        resultValue.textContent = "尚未抽取";
+        renderHistory();
+      });
+
+      window.addEventListener("resize", setupHiDPI);
+      setupHiDPI();
+    })();
+  </script>
+</body>
+</html>
